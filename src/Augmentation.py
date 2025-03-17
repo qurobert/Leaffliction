@@ -34,6 +34,25 @@ def contrast(image, alpha=1.5, beta=10):
     return cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
 
 
+def projective(image):
+    h, w, _ = image.shape
+
+    src_pts = np.float32([[0, 0], [w-1, 0], [0, h-1], [w-1, h-1]])
+
+    dst_pts = np.float32([
+        [w * 0.1, h * 0.2],
+        [w * 0.9, h * 0.1],
+        [w * 0.2, h * 0.9],
+        [w * 0.8, h * 0.8]
+    ])
+
+    M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+
+    projected_img = cv2.warpPerspective(image, M, (w, h))
+
+    return projected_img
+
+
 def display_images(images):
     for idx, (title, image) in enumerate(images.items()):
         plt.subplot(2, math.ceil(len(images) / 2), idx + 1)
@@ -65,6 +84,7 @@ def main():
         "Contrast": contrast(image),
         "Rotated": rotate(image, random.randint(20, 90)),
         "Blur": blur(image),
+        "Projective": projective(image)
     }
     save_images(filename, augmented_files)
     display_images(augmented_files)
