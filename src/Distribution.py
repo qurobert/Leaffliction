@@ -10,18 +10,23 @@ def get_args():
     if len(sys.argv) < 2:
         raise Exception("Please provide a directory")
     root_directory = sys.argv[1]
-    if not os.path.isdir(root_directory):
-        raise Exception("Please provide a valid directory")
     return root_directory
 
 
-def get_directory_files():
-    root_directory = get_args()
+def get_directory_files(directory_path):
+    if not os.path.isdir(directory_path):
+        raise Exception("Please provide a valid directory")
+    dir_files = get_recursive_files(directory_path)
+    return filter_directory_files(dir_files)
+
+
+def get_recursive_files(directory_path):
+
     directory_files = {}
 
     # Get all files in subdirectories
-    for path, _, files in os.walk(root_directory):
-        if path == root_directory:
+    for path, _, files in os.walk(directory_path):
+        if path == directory_path:
             continue
         for name in files:
             path_name = path.split("/")[len(path.split("/")) - 1]
@@ -30,13 +35,13 @@ def get_directory_files():
             else:
                 directory_files[path_name].append(name)
 
-    # Return root_directory files if no subdirectories
+    # Return directory_path files if no subdirectories
     if not directory_files:
-        name = root_directory.split("/")[len(root_directory.split("/")) - 1]
+        name = directory_path.split("/")[len(directory_path.split("/")) - 1]
 
-        directory_files[name] = [f for f in os.listdir(root_directory)
+        directory_files[name] = [f for f in os.listdir(directory_path)
                                  if opath.isfile(
-                opath.join(root_directory, f))]
+                opath.join(directory_path, f))]
 
     return directory_files
 
@@ -81,7 +86,8 @@ def display_directory_files(directory_files):
 
 
 def main():
-    directory_files = filter_directory_files(get_directory_files())
+    directory_path = get_args()
+    directory_files = get_directory_files(directory_path)
     display_directory_files(directory_files)
 
 

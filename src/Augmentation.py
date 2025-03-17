@@ -5,6 +5,7 @@ import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 
 
 def flip(image):
@@ -53,6 +54,19 @@ def projective(image):
     return projected_img
 
 
+def argument_parser():
+    parser = argparse.ArgumentParser(
+        prog="Augmentation leaf image",
+        description="This program augment the dataset")
+    parser.add_argument('filename', help="Filename to augment")
+    parser.add_argument('--no-display', action='store_false', help="Display augmentation")
+    args = parser.parse_args()
+    filename = args.filename
+    if os.path.exists(filename) is False or os.path.splitext(filename)[1].lower() not in [".jpg", ".jpeg", ".png"]:
+        raise Exception("Please provide a valid image file")
+    return [filename, args.no_display]
+
+
 def display_images(images):
     for idx, (title, image) in enumerate(images.items()):
         plt.subplot(2, math.ceil(len(images) / 2), idx + 1)
@@ -60,6 +74,19 @@ def display_images(images):
         plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         plt.axis("off")
     plt.show()
+
+
+def augmented_files(filename):
+    image = cv2.imread(filename)
+    return {
+        "Original": image,
+        "Flipped": flip(image),
+        "Cropped": crop(image),
+        "Contrast": contrast(image),
+        "Rotated": rotate(image, random.randint(20, 90)),
+        "Blur": blur(image),
+        "Projective": projective(image)
+    }
 
 
 def save_images(original_filename, images, output_directory='augmented_directory'):
@@ -70,24 +97,11 @@ def save_images(original_filename, images, output_directory='augmented_directory
 
 
 def main():
-    if len(sys.argv) < 2:
-        raise Exception("Please provide an image file")
-    filename = sys.argv[1]
-    if os.path.exists(filename) is False or os.path.splitext(filename)[1].lower() not in [".jpg", ".jpeg", ".png"]:
-        raise Exception("Please provide a valid image file")
-
-    image = cv2.imread(filename)
-    augmented_files = {
-        "Original": image,
-        "Flipped": flip(image),
-        "Cropped": crop(image),
-        "Contrast": contrast(image),
-        "Rotated": rotate(image, random.randint(20, 90)),
-        "Blur": blur(image),
-        "Projective": projective(image)
-    }
-    save_images(filename, augmented_files)
-    display_images(augmented_files)
+    filename, is_display = argument_parser()
+    images = augmented_files(filename)
+    save_images(filename, images)
+    if is_display:
+        display_images(images)
 
 
 if __name__ == "__main__":
