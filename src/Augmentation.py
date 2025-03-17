@@ -1,6 +1,5 @@
 import math
 import random
-import sys
 import os
 import cv2
 import numpy as np
@@ -91,6 +90,7 @@ def augmented_files(filename):
 
 def save_images(original_filename, images, output_directory='augmented_directory'):
     original_name, original_ext = os.path.splitext(os.path.basename(original_filename))
+    os.makedirs(output_directory, exist_ok=True)
     for title, image in images.items():
         new_name = f"{original_name}_{title.lower()}{original_ext}"
         cv2.imwrite(f"{output_directory}/{new_name}", image)
