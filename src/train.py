@@ -1,4 +1,6 @@
 import argparse
+import hashlib
+import shutil
 import zipfile
 import os
 import keras
@@ -9,11 +11,12 @@ from tensorflow import data as tf_data
 import tensorflow as tf
 import json
 
+
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog="Leaf computer vision to classify plant disease",
         description="This program balanced the dataset, transform it and train with scikit-learn")
-    parser.add_argument('--raw_dir',
+    parser.add_argument('raw_dir',
                         type=str,
                         help="Raw dataset directory",
                         default="data/raw")
@@ -21,22 +24,60 @@ def argument_parser():
                         type=str,
                         default="data/processed",
                         help="The processed dataset directory")
+    parser.add_argument('--model_dir',
+                        type=str,
+                        default="data/model",
+                        help="The model dataset directory")
     parser.add_argument('--no_processing',
                         action="store_false",
                         help="Do not preprocess the dataset")
+    parser.add_argument('--zip_filename',
+                        type=str,
+                        default="data/model.zip",
+                        help="The name of the zip file to save the model")
     return parser.parse_args()
 
 
-def save_output_directory_in_zip(output_directory):
-    with zipfile.ZipFile(f"train.zip", "w") as zipf:
-        for root, dirs, files in os.walk(output_directory):
+def compute_sha256(file_path):
+    """ Calcule le hash SHA256 d'un fichier """
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        while chunk := f.read(4096):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def zip_processed_and_model_with_signature(processed_dir, model_dir, zip_path, signature_path="signature.txt"):
+    with zipfile.ZipFile(zip_path, "w") as zipf:
+        # Image training
+        for root, dirs, files in os.walk(processed_dir):
+            for file in files:
+                zipf.write(os.path.join(root, file))
+
+        # Model
+        for root, dirs, files in os.walk(model_dir):
             for file in files:
                 zipf.write(os.path.join(root, file))
 
 
-def split_dataset_and_prepare_data(directory):
+    signature = compute_sha256(zip_path)
+
+    # Ajouter la signature dans signature.txt
+    with open(signature_path, "w") as sig_file:
+        sig_file.write(f"{signature}  {os.path.basename(zip_path)}\n")
+
+    print(f"✅ ZIP créé : {zip_path}")
+
+    print(f"✅ Signature générée : {signature}")
+
+    # Delete files
+    shutil.rmtree(processed_dir)
+    shutil.rmtree(model_dir)
+
+
+def split_dataset_and_prepare_data(processed_dir, model_dir):
     train_dataset, val_dataset = image_dataset_from_directory(
-        directory,
+        processed_dir,
         validation_split=0.2,
         subset="both",
         seed=42,
@@ -45,7 +86,8 @@ def split_dataset_and_prepare_data(directory):
     )
     # INFO
     class_names = train_dataset.class_names
-    with open("./data/model/class_names.json", "w") as f:
+    os.makedirs(model_dir, exist_ok=True)
+    with open(os.path.join(model_dir, "class_names.json"), "w+") as f:
         json.dump(class_names, f)
     image_size = (256, 256)
 
@@ -87,11 +129,13 @@ def make_model(img_size, num_classes):
 def main():
     args = argument_parser()
     raw_dir, processed_dir, is_preprocessing = args.raw_dir, args.processed_dir, args.no_processing
+    model_dir = args.model_dir
+    zip_filename = args.zip_filename
     if is_preprocessing:
         balanced_dataset(raw_dir, processed_dir, number_of_features_by_classes=1000)
 
     # Split the dataset and prepare it
-    train_dataset, val_dataset, class_names, image_size = split_dataset_and_prepare_data(processed_dir)
+    train_dataset, val_dataset, class_names, image_size = split_dataset_and_prepare_data(processed_dir, model_dir)
 
     # Make the model
     num_classes = len(class_names)
@@ -103,21 +147,22 @@ def main():
                   metrics=[keras.metrics.BinaryAccuracy(name="acc")])
 
     # Train the model
-    callbacks = [
-        keras.callbacks.ModelCheckpoint("save_at_{epoch}.keras"),
-    ]
-    model.fit(train_dataset, validation_data=val_dataset, epochs=10, callbacks=callbacks)
+    model.fit(train_dataset, validation_data=val_dataset, epochs=10)
 
-    # TODO: Make a zip of processed + model
-    model.save("./data/model/model.keras")
-    # save_output_directory_in_zip(output_directory)
+    # Save the model
+    model.save(os.path.join(model_dir, "model.keras"))
 
+
+    # Evaluate the model
     test_loss, test_acc = model.evaluate(val_dataset)
     print(f"Test Accuracy: {test_acc:.2f}")
 
+    # Make a zip of processed + model and remove directory
+    zip_processed_and_model_with_signature(processed_dir, model_dir, zip_filename)
+
 
 if __name__ == "__main__":
-    # try:
-    main()
-    # except Exception as e:
-    #     print(e)
+    try:
+        main()
+    except Exception as e:
+        print(e)
