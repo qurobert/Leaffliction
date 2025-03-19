@@ -2,6 +2,7 @@ data/images
 augmented_directory
 leaves.zip
 ici
+images
 *.zip
 .DS_Store
 **/.DS_Store
