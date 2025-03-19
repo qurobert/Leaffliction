@@ -3,6 +3,7 @@ import hashlib
 import zipfile
 import os
 import keras
+import logging
 from train_balanced_dataset import balanced_dataset
 from keras.src.utils import image_dataset_from_directory
 from keras import layers
@@ -128,6 +129,16 @@ def make_model(img_size, num_classes):
     ])
 
 
+def configure_logger():
+    log_filename = "training.log"
+    logging.basicConfig(
+        filename=log_filename,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    tf.get_logger().setLevel(logging.INFO)
+
+
 def main():
     args = argument_parser()
     raw_dir = args.raw_dir
@@ -135,6 +146,11 @@ def main():
     is_preprocessing = args.no_processing
     model_dir = args.model_dir
     zip_filename = args.zip_filename
+
+    # Configure the logger
+    configure_logger()
+
+    # Preprocess the dataset
     if is_preprocessing:
         balanced_dataset(raw_dir,
                          processed_dir,
@@ -163,7 +179,9 @@ def main():
 
     # Evaluate the model
     test_loss, test_acc = model.evaluate(val_dataset)
-    print(f"Test Accuracy: {test_acc:.2f}")
+    log_message = f"Test Accuracy: {test_acc:.2f}"
+    print(log_message)
+    logging.info(log_message)
 
     # Make a zip of processed + model and remove directory
     zip_processed_and_model_with_signature(processed_dir,
