@@ -2,10 +2,14 @@ data/images
 augmented_directory
 leaves.zip
 ici
-data
 *.zip
-
-
+.DS_Store
+**/.DS_Store
+*/model.zip
+model.zip
+data/raw/
+data/model/*
+data/processed/*
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm
 

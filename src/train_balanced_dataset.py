@@ -7,7 +7,9 @@ import shutil
 import random
 
 
-def balanced_dataset(raw_directory, processed_directory, number_of_features_by_classes=2000):
+def balanced_dataset(raw_directory,
+                     processed_directory,
+                     number_of_features_by_classes=1000):
     dir_files = get_directory_files(raw_directory)
     os.makedirs(processed_directory, exist_ok=True)
     if len(os.listdir(processed_directory)) != 0:
@@ -32,7 +34,8 @@ def balanced_dataset(raw_directory, processed_directory, number_of_features_by_c
         error_count = 0
         while count < number_of_features_by_classes:
             if number_of_features_by_classes - count > len(dir_files[key]) * 6:
-                raise Exception("Not enough files to augment, please add more files to the dataset")
+                raise Exception("Not enough files to augment, "
+                                "please add more files to the dataset")
             # Get random file
             file = random.choice(list(dir_files[key]))
             filename = os.path.join(raw_directory, key, file)
@@ -43,14 +46,17 @@ def balanced_dataset(raw_directory, processed_directory, number_of_features_by_c
             title = random.choice(list(augmented.keys()))
 
             # Save augmented image
-            original_name, original_ext = os.path.splitext(os.path.basename(filename))
+            base_name = os.path.basename(filename)
+            original_name, original_ext = os.path.splitext(base_name)
             new_name = f"{original_name}_{title.lower()}{original_ext}"
             if new_name not in os.listdir(f"{processed_directory}/{key}"):
-                cv2.imwrite(f"{processed_directory}/{key}/{new_name}", augmented[title])
+                cv2.imwrite(f"{processed_directory}/{key}/{new_name}",
+                            augmented[title])
 
                 # Update count
                 count += 1
             else:
                 error_count += 1
                 if error_count > 1000:
-                    raise Exception("Error count is too high, please check the code")
+                    raise Exception("Error count is too high, "
+                                    "please check the code")
