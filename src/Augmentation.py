@@ -1,6 +1,5 @@
 import math
 import random
-import sys
 import os
 import cv2
 import numpy as np
@@ -28,7 +27,15 @@ def crop(image, crop_size=(150, 150)):
     max_y = height - crop_size[1]
     start_x = np.random.randint(0, max_x)
     start_y = np.random.randint(0, max_y)
-    return image[start_y:start_y + crop_size[1], start_x:start_x + crop_size[0]]
+    cropped_image = image[start_y:start_y + crop_size[1], start_x:start_x + crop_size[0]]
+    pad_top = (height - crop_size[1]) // 2
+    pad_bottom = height - crop_size[1] - pad_top
+    pad_left = (width - crop_size[0]) // 2
+    pad_right = width - crop_size[0] - pad_left
+
+    padded_image = cv2.copyMakeBorder(cropped_image, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
+    return padded_image
 
 
 def contrast(image, alpha=1.5, beta=10):
@@ -91,6 +98,7 @@ def augmented_files(filename):
 
 def save_images(original_filename, images, output_directory='augmented_directory'):
     original_name, original_ext = os.path.splitext(os.path.basename(original_filename))
+    os.makedirs(output_directory, exist_ok=True)
     for title, image in images.items():
         new_name = f"{original_name}_{title.lower()}{original_ext}"
         cv2.imwrite(f"{output_directory}/{new_name}", image)
