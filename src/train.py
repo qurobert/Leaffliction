@@ -1,6 +1,5 @@
 import argparse
 import hashlib
-import shutil
 import zipfile
 import os
 import keras
@@ -15,7 +14,8 @@ import json
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog="Leaf computer vision to classify plant disease",
-        description="This program balanced the dataset, transform it and train with scikit-learn")
+        description="This program balanced the dataset,"
+                    " transform it and train with scikit-learn")
     parser.add_argument('raw_dir',
                         type=str,
                         help="Raw dataset directory",
@@ -47,7 +47,11 @@ def compute_sha256(file_path):
     return hasher.hexdigest()
 
 
-def zip_processed_and_model_with_signature(processed_dir, model_dir, zip_path, signature_path="signature.txt"):
+def zip_processed_and_model_with_signature(
+        processed_dir,
+        model_dir,
+        zip_path,
+        signature_path="signature.txt"):
     with zipfile.ZipFile(zip_path, "w") as zipf:
         # Image training
         for root, dirs, files in os.walk(processed_dir):
@@ -59,7 +63,6 @@ def zip_processed_and_model_with_signature(processed_dir, model_dir, zip_path, s
             for file in files:
                 zipf.write(os.path.join(root, file))
 
-
     signature = compute_sha256(zip_path)
 
     # Ajouter la signature dans signature.txt
@@ -69,10 +72,6 @@ def zip_processed_and_model_with_signature(processed_dir, model_dir, zip_path, s
     print(f"✅ ZIP créé : {zip_path}")
 
     print(f"✅ Signature générée : {signature}")
-
-    # Delete files
-    shutil.rmtree(processed_dir)
-    shutil.rmtree(model_dir)
 
 
 def split_dataset_and_prepare_data(processed_dir, model_dir):
@@ -96,13 +95,16 @@ def split_dataset_and_prepare_data(processed_dir, model_dir):
     train_dataset = train_dataset.map(lambda x, y: (normalization_layer(x), y))
     val_dataset = val_dataset.map(lambda x, y: (normalization_layer(x), y))
 
-    # Prefetch the dataset for better performance (use the CPU to load the data while the GPU is training)
+    # Prefetch the dataset for better performance
+    # (use the CPU to load the data while the GPU is training)
     train_dataset = train_dataset.prefetch(tf_data.AUTOTUNE)
     val_dataset = val_dataset.prefetch(tf_data.AUTOTUNE)
 
     # One hot encoding
-    train_dataset = train_dataset.map(lambda x, y: (x, tf.one_hot(y, len(class_names))))
-    val_dataset = val_dataset.map(lambda x, y: (x, tf.one_hot(y, len(class_names))))
+    train_dataset = train_dataset.map(
+        lambda x, y: (x, tf.one_hot(y, len(class_names))))
+    val_dataset = val_dataset.map(
+        lambda x, y: (x, tf.one_hot(y, len(class_names))))
 
     return train_dataset, val_dataset, class_names, image_size
 
@@ -121,21 +123,28 @@ def make_model(img_size, num_classes):
 
         layers.Flatten(),
         layers.Dense(128, activation='relu'),
-        layers.Dropout(0.5),  # Réduit l'overfitting
-        layers.Dense(num_classes, activation='softmax')  # Softmax pour la classification multi-classes
+        layers.Dropout(0.5),
+        layers.Dense(num_classes, activation='softmax')
     ])
 
 
 def main():
     args = argument_parser()
-    raw_dir, processed_dir, is_preprocessing = args.raw_dir, args.processed_dir, args.no_processing
+    raw_dir = args.raw_dir
+    processed_dir = args.processed_dir
+    is_preprocessing = args.no_processing
     model_dir = args.model_dir
     zip_filename = args.zip_filename
     if is_preprocessing:
-        balanced_dataset(raw_dir, processed_dir, number_of_features_by_classes=1000)
+        balanced_dataset(raw_dir,
+                         processed_dir,
+                         number_of_features_by_classes=1000)
 
     # Split the dataset and prepare it
-    train_dataset, val_dataset, class_names, image_size = split_dataset_and_prepare_data(processed_dir, model_dir)
+    (train_dataset,
+     val_dataset,
+     class_names,
+     image_size) = split_dataset_and_prepare_data(processed_dir, model_dir)
 
     # Make the model
     num_classes = len(class_names)
@@ -152,13 +161,14 @@ def main():
     # Save the model
     model.save(os.path.join(model_dir, "model.keras"))
 
-
     # Evaluate the model
     test_loss, test_acc = model.evaluate(val_dataset)
     print(f"Test Accuracy: {test_acc:.2f}")
 
     # Make a zip of processed + model and remove directory
-    zip_processed_and_model_with_signature(processed_dir, model_dir, zip_filename)
+    zip_processed_and_model_with_signature(processed_dir,
+                                           model_dir,
+                                           zip_filename)
 
 
 if __name__ == "__main__":

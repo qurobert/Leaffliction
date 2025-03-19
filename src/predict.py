@@ -18,41 +18,40 @@ def predict_image(path, model, class_names):
     return prediction.lower() in path.lower()
 
 
-
-
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog="Leaf computer vision to classify plant disease",
-        description="This program balanced the dataset, transform it and train with scikit-learn")
+        description="This program predict from training with CNN model,"
+                    " and can take a filename as argument"
+                    " or directory to test the accuracy")
     parser.add_argument('path',
                         type=str,
-                        help="Path to an image file or a directory containing images to predict")
-    parser.add_argument('--model_filename',
+                        help="Path to an image file"
+                             " or a directory containing images to predict")
+    parser.add_argument('--model_dir',
                         type=str,
-                        default="data/model/model.keras",
+                        default="data/model",
                         help="The model file")
     return parser.parse_args()
 
 
 def main():
     args = argument_parser()
-    path, model_filename = args.path, args.model_filename
-    model = keras.models.load_model(model_filename)
-    with open("./data/model/class_names.json", "r") as f:
+    path, model_dir = args.path, args.model_dir
+    model = keras.models.load_model(os.path.join(model_dir, "model.keras"))
+    with open(os.path.join(model_dir, "class_names.json"), "r") as f:
         class_names = json.load(f)
 
     if os.path.isfile(path):
         result = predict_image(path, model, class_names)
-        if result:
-            print("Good prediction")
-        else:
-            print("Bad prediction")
+        print("Good prediction" if result else "Bad prediction")
     elif os.path.isdir(path):
         result_count = 0
         total = 0
         for root, _, files in os.walk(path):
             for filename in files:
-                if filename.lower().endswith(".jpg") or filename.lower().endswith(".png"):
+                if (filename.lower().endswith(".jpg")
+                        or filename.lower().endswith(".png")):
                     file_path = os.path.join(root, filename)
                     result = predict_image(file_path, model, class_names)
                     if result:
@@ -70,4 +69,3 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print(e)
-
