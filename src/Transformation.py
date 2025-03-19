@@ -37,82 +37,131 @@ def load_image(image_path):
 
 def apply_gaussian_blur(img_rgb):
     """Apply Gaussian blur to the image"""
-    return pcv.gaussian_blur(img_rgb, ksize=(5, 5))
+    s = pcv.rgb2gray_hsv(rgb_img=img_rgb, channel="s")
+    s_thresh = pcv.threshold.binary(
+        gray_img=s, threshold=60, object_type="light"
+    )
+    s_gblur = pcv.gaussian_blur(img=s_thresh, ksize=(5, 5),
+                                sigma_x=0, sigma_y=None)
+
+    return s_gblur
 
 
-def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_value=130, config_path=None):
+def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_value=130, config_path=None, img_blur=None):
     """Create a binary mask for the plant with dynamic thresholding based on disease type"""
-    # Default threshold parameters
-    final_threshold_method = 'light'
-    final_threshold_value = threshold_value
+    # # Default threshold parameters
+    # final_threshold_method = 'light'
+    # final_threshold_value = threshold_value
+    #
+    # # If auto method is chosen, try to determine from image path
+    # if threshold_method == 'auto' and image_path:
+    #     # Load configuration file if provided
+    #     config = {}
+    #     if config_path:
+    #         config = load_threshold_config(config_path)
+    #
+    #     image_path_lower = image_path.lower()
+    #
+    #     # Define which diseases need 'light' thresholding if not in config
+    #     light_threshold_diseases = [
+    #         'black_rot',
+    #         'grape_esca',
+    #         'grape_spot',
+    #         'apple_rust'
+    #     ]
+    #
+    #     # First check if we have specific config for this disease
+    #     disease_match = None
+    #     for disease in config.keys():
+    #         if disease.lower() in image_path_lower:
+    #             disease_match = disease
+    #             break
+    #
+    #     if disease_match:
+    #         # Use values from config
+    #         final_threshold_method = config[disease_match].get('method', 'light')
+    #         final_threshold_value = config[disease_match].get('value', 130)
+    #     else:
+    #         # Use defaults based on disease detection
+    #         if any(disease in image_path_lower for disease in light_threshold_diseases):
+    #             final_threshold_method = 'light'
+    #         else:
+    #             final_threshold_method = 'dark'
+    # elif threshold_method != 'auto':
+    #     # Use the explicitly specified method
+    #     final_threshold_method = threshold_method
 
-    # If auto method is chosen, try to determine from image path
-    if threshold_method == 'auto' and image_path:
-        # Load configuration file if provided
-        config = {}
-        if config_path:
-            config = load_threshold_config(config_path)
+    # # Convert to HSV color space for saturation channel
+    # s = pcv.rgb2gray_hsv(img_rgb, 's')
+    # s_thresh = pcv.threshold.binary(s, 80, 'light')
+    # s_mblur = pcv.median_blur(s_thresh, 5)
+    #
+    # # Convert to LAB color space for a channel
+    # b = pcv.rgb2gray_lab(img_rgb, 'a')
+    #
+    # # Apply dynamic thresholding based on the determined method
+    # b_thresh = pcv.threshold.binary(b, final_threshold_value, final_threshold_method)
+    #
+    # # Fill small objects
+    # b_fill = pcv.fill(b_thresh, 5)
+    #
+    # # Combine the thresholds
+    # mask = pcv.logical_or(bin_img1=s_mblur, bin_img2=b_fill)
+    #
+    # # Clean up the mask
+    # mask = pcv.fill(mask, 100)  # Fill small holes
+    # mask = pcv.dilate(mask, 3, 1)  # Dilate to capture more of the leaf
+    # mask = pcv.erode(mask, 3, 1)  # Erode to clean edges
+    # mask = pcv.fill(mask, 3)  # Final fill
+    pcv.plot_image(img_rgb)
+    # pcv.plot_image(img_blur)
+    b = pcv.rgb2gray_lab(rgb_img=img_rgb, channel="b")
+    b_thresh = pcv.threshold.binary(
+        gray_img=b, threshold=200, object_type="light"
+    )
+    bs = pcv.logical_or(bin_img1=img_blur, bin_img2=b_thresh)
 
-        image_path_lower = image_path.lower()
+    masked = pcv.apply_mask(img=img_rgb, mask=bs, mask_color="white")
 
-        # Define which diseases need 'light' thresholding if not in config
-        light_threshold_diseases = [
-            'black_rot',
-            'grape_esca',
-            'grape_spot',
-            'apple_rust'
-        ]
+    masked_a = pcv.rgb2gray_lab(rgb_img=masked, channel="a")
+    masked_b = pcv.rgb2gray_lab(rgb_img=masked, channel="b")
 
-        # First check if we have specific config for this disease
-        disease_match = None
-        for disease in config.keys():
-            if disease.lower() in image_path_lower:
-                disease_match = disease
-                break
+    maskeda_thresh = pcv.threshold.binary(
+        gray_img=masked_a, threshold=115,
+        object_type="dark"
+    )
+    maskeda_thresh1 = pcv.threshold.binary(
+        gray_img=masked_a, threshold=135,
+        object_type="light"
+    )
+    maskedb_thresh = pcv.threshold.binary(
+        gray_img=masked_b, threshold=128,
+        object_type="light"
+    )
 
-        if disease_match:
-            # Use values from config
-            final_threshold_method = config[disease_match].get('method', 'light')
-            final_threshold_value = config[disease_match].get('value', 130)
-        else:
-            # Use defaults based on disease detection
-            if any(disease in image_path_lower for disease in light_threshold_diseases):
-                final_threshold_method = 'light'
-            else:
-                final_threshold_method = 'dark'
-    elif threshold_method != 'auto':
-        # Use the explicitly specified method
-        final_threshold_method = threshold_method
+    ab1 = pcv.logical_or(bin_img1=maskeda_thresh, bin_img2=maskedb_thresh)
+    ab = pcv.logical_or(bin_img1=maskeda_thresh1, bin_img2=ab1)
 
-    # Convert to HSV color space for saturation channel
-    s = pcv.rgb2gray_hsv(img_rgb, 's')
-    s_thresh = pcv.threshold.binary(s, 80, 'light')
-    s_mblur = pcv.median_blur(s_thresh, 5)
+    xor_img = pcv.logical_xor(bin_img1=maskeda_thresh,
+                              bin_img2=maskedb_thresh)
+    xor_img_color = pcv.apply_mask(img=img_rgb, mask=xor_img,
+                                   mask_color="white")
 
-    # Convert to LAB color space for a channel
-    b = pcv.rgb2gray_lab(img_rgb, 'a')
+    ab_fill = pcv.fill(bin_img=ab, size=200)
 
-    # Apply dynamic thresholding based on the determined method
-    b_thresh = pcv.threshold.binary(b, final_threshold_value, final_threshold_method)
+    masked2 = pcv.apply_mask(img=masked, mask=ab_fill, mask_color="white")
 
-    # Fill small objects
-    b_fill = pcv.fill(b_thresh, 5)
+    pcv.plot_image(masked)
+    pcv.plot_image(ab_fill)
+    pcv.plot_image(masked2)
 
-    # Combine the thresholds
-    mask = pcv.logical_or(bin_img1=s_mblur, bin_img2=b_fill)
-
-    # Clean up the mask
-    mask = pcv.fill(mask, 100)  # Fill small holes
-    mask = pcv.dilate(mask, 3, 1)  # Dilate to capture more of the leaf
-    mask = pcv.erode(mask, 3, 1)  # Erode to clean edges
-    mask = pcv.fill(mask, 3)  # Final fill
-
-    return mask
+    return masked, ab_fill
 
 
-def apply_mask_to_image(img_rgb, mask):
+def apply_mask_to_image(masked_img, mask):
     """Apply the binary mask to the original image"""
-    return pcv.apply_mask(img=img_rgb, mask=mask, mask_color='white')
+    return pcv.apply_mask(img=masked_img, mask=mask, mask_color="white")
+    # return pcv.apply_mask(img=img_rgb, mask=mask, mask_color='white')
 
 
 def analyze_object(img_rgb, mask):
@@ -303,12 +352,13 @@ def process_image(image_path, destination=None, operations=None, display=False,
             if destination:
                 save_path = os.path.join(destination, f"{file_name}_gaussian_blur{ext}")
                 save_image(img_rgb_processed, save_path)
-    else:
-        img_rgb_processed = img_rgb
+    # else:
+    #     img_rgb_processed = img_rgb
 
     # 3. Create mask
     if any(op in operations for op in ['mask', 'masked', 'analyze', 'landmarks']):
-        mask = create_mask(img_rgb_processed, image_path, threshold_method, threshold_value, config_path)
+        masked_img, mask = create_mask(img_rgb, image_path, threshold_method, threshold_value, config_path,
+                           img_blur=results['blur'])
         if 'mask' in operations:
             results['mask'] = mask
             transformations.append((mask, "Mask"))
@@ -318,7 +368,7 @@ def process_image(image_path, destination=None, operations=None, display=False,
 
         # 4. Apply mask to image
         if 'masked' in operations:
-            applied = apply_mask_to_image(img_rgb_processed, mask)
+            applied = apply_mask_to_image(masked_img, mask)
             results['masked'] = applied
             transformations.append((applied, "Applied Mask"))
             if destination:
@@ -327,7 +377,7 @@ def process_image(image_path, destination=None, operations=None, display=False,
 
         # 5. Analyze object
         if 'analyze' in operations:
-            shape_img = analyze_object(img_rgb_processed, mask)
+            shape_img = analyze_object(img_rgb, mask)
             results['analyze'] = shape_img
             transformations.append((shape_img, "Analyze Object"))
             if destination:
@@ -336,7 +386,7 @@ def process_image(image_path, destination=None, operations=None, display=False,
 
         # 6. Generate pseudolandmarks
         if 'landmarks' in operations:
-            pseudo_img = generate_pseudolandmarks(img_rgb_processed, mask)
+            pseudo_img = generate_pseudolandmarks(img_rgb, mask)
             results['landmarks'] = pseudo_img
             transformations.append((pseudo_img, "Pseudolandmarks"))
             if destination:
