@@ -136,7 +136,6 @@ def configure_logger():
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s"
     )
-    tf.get_logger().setLevel(logging.INFO)
 
 
 def main():
@@ -151,10 +150,10 @@ def main():
     configure_logger()
 
     # Preprocess the dataset
-    if is_preprocessing:
-        balanced_dataset(raw_dir,
-                         processed_dir,
-                         number_of_features_by_classes=1000)
+    # if is_preprocessing:
+    #     balanced_dataset(raw_dir,
+    #                      processed_dir,
+    #                      number_of_features_by_classes=1000)
 
     # Split the dataset and prepare it
     (train_dataset,
