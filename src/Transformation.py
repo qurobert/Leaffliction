@@ -8,25 +8,140 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from plantcv import plantcv as pcv
+import json
 
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='Leaf Image Transformation Tool')
-    parser.add_argument('path', nargs='?', help='Path to a single image to display transformations')
-    parser.add_argument('-src', '--source', help='Source directory containing images to process and save')
-    parser.add_argument('-dst', '--destination', help='Destination directory for saving transformed images')
+# Function definitions
 
-    # Add transformation options as boolean flags
-    parser.add_argument('-original', action='store_true', help='Save original image')
-    parser.add_argument('-blur', action='store_true', help='Apply Gaussian blur transformation')
-    parser.add_argument('-mask', action='store_true', help='Generate binary mask')
-    parser.add_argument('-masked', action='store_true', help='Apply mask to the original image')
-    parser.add_argument('-analyze', action='store_true', help='Analyze object size and shape')
-    parser.add_argument('-landmarks', action='store_true', help='Generate pseudolandmarks')
-    parser.add_argument('-histogram', action='store_true', help='Generate color histogram')
-    parser.add_argument('-all', action='store_true', help='Apply all transformations')
+def load_threshold_config(config_path):
+    """Load threshold configuration from JSON file"""
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Warning: Could not load threshold config file: {e}")
+        return {}
 
-    return parser.parse_args()
+
+def load_image(image_path):
+    """Load an image using PlantCV"""
+    img, path, filename = pcv.readimage(image_path)
+    if img is None:
+        print(f"Error: Could not read the image: {image_path}")
+        return None, None, None
+
+    # Convert BGR to RGB for processing
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img_rgb, path, filename
+
+
+def apply_gaussian_blur(img_rgb):
+    """Apply Gaussian blur to the image"""
+    return pcv.gaussian_blur(img_rgb, ksize=(5, 5))
+
+
+def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_value=130, config_path=None):
+    """Create a binary mask for the plant with dynamic thresholding based on disease type"""
+    # Default threshold parameters
+    final_threshold_method = 'light'
+    final_threshold_value = threshold_value
+
+    # If auto method is chosen, try to determine from image path
+    if threshold_method == 'auto' and image_path:
+        # Load configuration file if provided
+        config = {}
+        if config_path:
+            config = load_threshold_config(config_path)
+
+        image_path_lower = image_path.lower()
+
+        # Define which diseases need 'light' thresholding if not in config
+        light_threshold_diseases = [
+            'black_rot',
+            'grape_esca',
+            'grape_spot',
+            'apple_rust'
+        ]
+
+        # First check if we have specific config for this disease
+        disease_match = None
+        for disease in config.keys():
+            if disease.lower() in image_path_lower:
+                disease_match = disease
+                break
+
+        if disease_match:
+            # Use values from config
+            final_threshold_method = config[disease_match].get('method', 'light')
+            final_threshold_value = config[disease_match].get('value', 130)
+        else:
+            # Use defaults based on disease detection
+            if any(disease in image_path_lower for disease in light_threshold_diseases):
+                final_threshold_method = 'light'
+            else:
+                final_threshold_method = 'dark'
+    elif threshold_method != 'auto':
+        # Use the explicitly specified method
+        final_threshold_method = threshold_method
+
+    # Convert to HSV color space for saturation channel
+    s = pcv.rgb2gray_hsv(img_rgb, 's')
+    s_thresh = pcv.threshold.binary(s, 80, 'light')
+    s_mblur = pcv.median_blur(s_thresh, 5)
+
+    # Convert to LAB color space for a channel
+    b = pcv.rgb2gray_lab(img_rgb, 'a')
+
+    # Apply dynamic thresholding based on the determined method
+    b_thresh = pcv.threshold.binary(b, final_threshold_value, final_threshold_method)
+
+    # Fill small objects
+    b_fill = pcv.fill(b_thresh, 5)
+
+    # Combine the thresholds
+    mask = pcv.logical_or(bin_img1=s_mblur, bin_img2=b_fill)
+
+    # Clean up the mask
+    mask = pcv.fill(mask, 100)  # Fill small holes
+    mask = pcv.dilate(mask, 3, 1)  # Dilate to capture more of the leaf
+    mask = pcv.erode(mask, 3, 1)  # Erode to clean edges
+    mask = pcv.fill(mask, 3)  # Final fill
+
+    return mask
+
+
+def apply_mask_to_image(img_rgb, mask):
+    """Apply the binary mask to the original image"""
+    return pcv.apply_mask(img=img_rgb, mask=mask, mask_color='white')
+
+
+def analyze_object(img_rgb, mask):
+    """Analyze the object size and shape"""
+    shape_img = pcv.analyze.size(img=img_rgb, labeled_mask=mask, n_labels=1)
+    pcv.outputs.save_results(filename="results.txt", outformat="json")
+    return shape_img
+
+
+def generate_pseudolandmarks(img_rgb, mask):
+    """Generate pseudolandmarks for the object"""
+    pseudo_img = img_rgb.copy()
+    pcv.params.debug_outdir = "./temp/"
+    top_x, bottom_x, center_v_x = pcv.homology.x_axis_pseudolandmarks(img=pseudo_img, mask=mask, label="default")
+
+    # Draw top pseudolandmarks in red
+    for point in top_x:
+        x, y = int(point[0][0]), int(point[0][1])
+        cv2.circle(pseudo_img, (x, y), 3, (255, 0, 0), -1)
+    # Draw center pseudolandmarks in green
+    for point in center_v_x:
+        x, y = int(point[0][0]), int(point[0][1])
+        cv2.circle(pseudo_img, (x, y), 3, (0, 255, 0), -1)
+    # Draw bottom pseudolandmarks in blue
+    for point in bottom_x:
+        x, y = int(point[0][0]), int(point[0][1])
+        cv2.circle(pseudo_img, (x, y), 3, (0, 0, 255), -1)
+
+    return pseudo_img
 
 
 def create_color_histogram(img_rgb):
@@ -91,102 +206,11 @@ def create_color_histogram(img_rgb):
     return hist_img
 
 
-def load_image(image_path):
-    """Load an image using PlantCV"""
-    img, path, filename = pcv.readimage(image_path)
-    if img is None:
-        print(f"Error: Could not read the image: {image_path}")
-        return None, None, None
-
-    # Convert BGR to RGB for processing
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return img_rgb, path, filename
-
-
-def apply_gaussian_blur(img_rgb):
-    """Apply Gaussian blur to the image"""
-    return pcv.gaussian_blur(img_rgb, ksize=(5, 5))
-
-
-def create_mask(img_rgb, image_path=None):
-    """Create a binary mask for the plant"""
-    threshold_method = 'light'  # Default method
-    if image_path:
-        image_path = image_path.lower()
-
-        # Define which diseases need 'light' thresholding
-        light_threshold_diseases = [
-            'black_rot',
-            'grape_esca',
-            'grape_spot',
-            'apple_rust'
-        ]
-
-        # Check if any of these disease names are in the path
-        if any(disease in image_path for disease in light_threshold_diseases):
-            threshold_method = 'light'
-        else:
-            threshold_method = 'dark'
-    # Convert to HSV color space for saturation channel
-    s = pcv.rgb2gray_hsv(img_rgb, 's')
-    s_thresh = pcv.threshold.binary(s, 80, 'light')
-    s_mblur = pcv.median_blur(s_thresh, 5)
-
-    # Convert to LAB color space for a channel
-    b = pcv.rgb2gray_lab(img_rgb, 'a')
-    # Threshold the blue image
-    b_thresh = pcv.threshold.binary(b, 130, threshold_method)
-    # Fill small objects
-    b_fill = pcv.fill(b_thresh, 5)
-
-    # Combine the thresholds
-    mask = pcv.logical_or(bin_img1=s_mblur, bin_img2=b_fill)
-
-    # Clean up the mask
-    mask = pcv.fill(mask, 100)  # Fill small holes
-    mask = pcv.dilate(mask, 3, 1)  # Dilate to capture more of the leaf
-    mask = pcv.erode(mask, 3, 1)  # Erode to clean edges
-    mask = pcv.fill(mask, 3)  # Final fill
-
-    return mask
-
-
-def apply_mask_to_image(img_rgb, mask):
-    """Apply the binary mask to the original image"""
-    return pcv.apply_mask(img=img_rgb, mask=mask, mask_color='white')
-
-
-def analyze_object(img_rgb, mask):
-    """Analyze the object size and shape"""
-    shape_img = pcv.analyze.size(img=img_rgb, labeled_mask=mask, n_labels=1)
-    pcv.outputs.save_results(filename="results.txt", outformat="json")
-    return shape_img
-
-
-def generate_pseudolandmarks(img_rgb, mask):
-    """Generate pseudolandmarks for the object"""
-    pseudo_img = img_rgb.copy()
-    pcv.params.debug_outdir = "./temp/"
-    top_x, bottom_x, center_v_x = pcv.homology.x_axis_pseudolandmarks(img=pseudo_img, mask=mask, label="default")
-
-    # Draw top pseudolandmarks in red
-    for point in top_x:
-        x, y = int(point[0][0]), int(point[0][1])
-        cv2.circle(pseudo_img, (x, y), 3, (255, 0, 0), -1)
-    # Draw center pseudolandmarks in green
-    for point in center_v_x:
-        x, y = int(point[0][0]), int(point[0][1])
-        cv2.circle(pseudo_img, (x, y), 3, (0, 255, 0), -1)
-    # Draw bottom pseudolandmarks in blue
-    for point in bottom_x:
-        x, y = int(point[0][0]), int(point[0][1])
-        cv2.circle(pseudo_img, (x, y), 3, (0, 0, 255), -1)
-
-    return pseudo_img
-
-
 def save_image(img, save_path):
     """Save an image to the specified path"""
+    # Create the directory if it doesn't exist
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
     # Convert back to BGR for saving with OpenCV if it's an RGB image
     if len(img.shape) == 3 and img.shape[2] == 3:
         img_save = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -216,91 +240,113 @@ def display_images(transformations):
     plt.show()
 
 
-def get_selected_transformations(args):
-    """Determine which transformations to apply based on args"""
-    # If no specific transformations are selected but -all is not used,
-    # apply all transformations by default
-    if not any([args.original, args.blur, args.mask, args.masked,
-                args.analyze, args.landmarks, args.histogram, args.all]):
-        return True  # Apply all transformations
+def process_image(image_path, destination=None, operations=None, display=False,
+                  threshold_method='auto', threshold_value=130, config_path=None, apply_blur=True):
+    """
+    Process a single image with specified transformations
 
-    # Otherwise, return the -all flag
-    return args.all
+    Parameters:
+    -----------
+    image_path : str
+        Path to the image to process
+    destination : str, optional
+        Directory to save the processed images
+    operations : list, optional
+        List of operations to perform, choose from
+        ['original', 'blur', 'mask', 'masked', 'analyze', 'landmarks', 'histogram']
+        If None, only returns the mask
+    display : bool, optional
+        Whether to display the processed images
+    threshold_method : str, optional
+        Thresholding method, one of 'auto', 'light', 'dark'
+    threshold_value : int, optional
+        Threshold value for the LAB channel
+    config_path : str, optional
+        Path to the configuration file
+    apply_blur : bool, optional
+        Whether to apply Gaussian blur before processing
 
-
-def process_image(image_path, destination=None, args=None, display=False):
-    """Process a single image with transformations"""
+    Returns:
+    --------
+    dict : Dictionary containing the processed images with their names as keys
+    """
     # Load the image
     img_rgb, path, filename = load_image(image_path)
     if img_rgb is None:
-        return
+        return None
 
-    # Create a list to store transformations that are actually performed
-    transformations = []
+    # Set default operations if none specified
+    if operations is None:
+        operations = ['mask']
+
+    # Dictionary to store results
+    results = {}
+    transformations = []  # For display purposes
+
     base_name = os.path.basename(image_path)
     file_name, ext = os.path.splitext(base_name)
 
-    # Check which transformations to apply based on arguments
-    apply_all = get_selected_transformations(args)
-
     # 1. Original image
-    if args.original or apply_all:
+    if 'original' in operations:
+        results['original'] = img_rgb
         transformations.append((img_rgb, "Original"))
         if destination:
             save_path = os.path.join(destination, f"{file_name}_original{ext}")
             save_image(img_rgb, save_path)
 
-    # 2. Gaussian blur
-    if args.blur or apply_all:
-        gaussian_blur = apply_gaussian_blur(img_rgb)
-        transformations.append((gaussian_blur, "Gaussian blur"))
-        if destination:
-            save_path = os.path.join(destination, f"{file_name}_gaussian_blur{ext}")
-            save_image(gaussian_blur, save_path)
-
-        # Use blurred image for subsequent operations
-        img_rgb = gaussian_blur
+    # 2. Apply blur if needed for further processing
+    if apply_blur or 'blur' in operations:
+        img_rgb_processed = apply_gaussian_blur(img_rgb)
+        if 'blur' in operations:
+            results['blur'] = img_rgb_processed
+            transformations.append((img_rgb_processed, "Gaussian blur"))
+            if destination:
+                save_path = os.path.join(destination, f"{file_name}_gaussian_blur{ext}")
+                save_image(img_rgb_processed, save_path)
+    else:
+        img_rgb_processed = img_rgb
 
     # 3. Create mask
-    mask = None
-    if args.mask or args.masked or args.analyze or args.landmarks or apply_all:
-        mask = create_mask(img_rgb, image_path)
-        if args.mask or apply_all:
+    if any(op in operations for op in ['mask', 'masked', 'analyze', 'landmarks']):
+        mask = create_mask(img_rgb_processed, image_path, threshold_method, threshold_value, config_path)
+        if 'mask' in operations:
+            results['mask'] = mask
             transformations.append((mask, "Mask"))
             if destination:
                 save_path = os.path.join(destination, f"{file_name}_mask{ext}")
                 save_image(mask, save_path)
 
-    # 4. Apply mask to image
-    if args.masked or apply_all:
-        if mask is not None:
-            applied = apply_mask_to_image(img_rgb, mask)
+        # 4. Apply mask to image
+        if 'masked' in operations:
+            applied = apply_mask_to_image(img_rgb_processed, mask)
+            results['masked'] = applied
             transformations.append((applied, "Applied Mask"))
             if destination:
                 save_path = os.path.join(destination, f"{file_name}_applied_mask{ext}")
                 save_image(applied, save_path)
 
-    # 5. Analyze object
-    if args.analyze or apply_all:
-        if mask is not None:
-            shape_img = analyze_object(img_rgb, mask)
+        # 5. Analyze object
+        if 'analyze' in operations:
+            shape_img = analyze_object(img_rgb_processed, mask)
+            results['analyze'] = shape_img
             transformations.append((shape_img, "Analyze Object"))
             if destination:
                 save_path = os.path.join(destination, f"{file_name}_analyze_object{ext}")
                 save_image(shape_img, save_path)
 
-    # 6. Generate pseudolandmarks
-    if args.landmarks or apply_all:
-        if mask is not None:
-            pseudo_img = generate_pseudolandmarks(img_rgb, mask)
+        # 6. Generate pseudolandmarks
+        if 'landmarks' in operations:
+            pseudo_img = generate_pseudolandmarks(img_rgb_processed, mask)
+            results['landmarks'] = pseudo_img
             transformations.append((pseudo_img, "Pseudolandmarks"))
             if destination:
                 save_path = os.path.join(destination, f"{file_name}_pseudolandmarks{ext}")
                 save_image(pseudo_img, save_path)
 
     # 7. Generate color histogram
-    if args.histogram or apply_all:
+    if 'histogram' in operations:
         hist_img = create_color_histogram(img_rgb)
+        results['histogram'] = hist_img
         transformations.append((hist_img, "Color Histogram"))
         if destination:
             save_path = os.path.join(destination, f"{file_name}_color_histogram{ext}")
@@ -310,20 +356,95 @@ def process_image(image_path, destination=None, args=None, display=False):
     if display and transformations:
         display_images(transformations)
 
-    return transformations
+    return results
 
 
+def process_directory(source_dir, destination_dir, operations=None,
+                      threshold_method='auto', threshold_value=130, config_path=None, apply_blur=True):
+    """Process all images in a directory"""
+    if not os.path.exists(destination_dir):
+        os.makedirs(destination_dir)
+
+    results = {}
+    for filename in os.listdir(source_dir):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
+            image_path = os.path.join(source_dir, filename)
+            print(f"Processing {image_path}...")
+            img_results = process_image(
+                image_path,
+                destination_dir,
+                operations,
+                False,
+                threshold_method,
+                threshold_value,
+                config_path,
+                apply_blur
+            )
+            if img_results:
+                results[filename] = img_results
+
+    return results
+
+
+# Main function (if script is run directly)
 def main():
-    args = parse_arguments()
+    parser = argparse.ArgumentParser(description='Leaf Image Transformation Tool')
+    parser.add_argument('path', nargs='?', help='Path to a single image to display transformations')
+    parser.add_argument('-src', '--source', help='Source directory containing images to process and save')
+    parser.add_argument('-dst', '--destination', help='Destination directory for saving transformed images')
 
-    # Create destination directory if specified and doesn't exist
-    if args.destination and not os.path.exists(args.destination):
-        os.makedirs(args.destination)
+    # Add transformation options as boolean flags
+    parser.add_argument('-original', action='store_true', help='Save original image')
+    parser.add_argument('-blur', action='store_true', help='Apply Gaussian blur transformation')
+    parser.add_argument('-mask', action='store_true', help='Generate binary mask')
+    parser.add_argument('-masked', action='store_true', help='Apply mask to the original image')
+    parser.add_argument('-analyze', action='store_true', help='Analyze object size and shape')
+    parser.add_argument('-landmarks', action='store_true', help='Generate pseudolandmarks')
+    parser.add_argument('-histogram', action='store_true', help='Generate color histogram')
+    parser.add_argument('-all', action='store_true', help='Apply all transformations')
+
+    # Add thresholding configuration
+    parser.add_argument('-threshold-method', choices=['auto', 'light', 'dark'], default='auto',
+                        help='Thresholding method (auto determines based on disease in filename)')
+    parser.add_argument('-threshold-value', type=int, default=130,
+                        help='Threshold value for LAB channel')
+    parser.add_argument('-config', help='Path to JSON config file with threshold settings for each disease')
+
+    args = parser.parse_args()
+
+    # Determine which operations to perform
+    operations = []
+    if args.original or args.all:
+        operations.append('original')
+    if args.blur or args.all:
+        operations.append('blur')
+    if args.mask or args.all:
+        operations.append('mask')
+    if args.masked or args.all:
+        operations.append('masked')
+    if args.analyze or args.all:
+        operations.append('analyze')
+    if args.landmarks or args.all:
+        operations.append('landmarks')
+    if args.histogram or args.all:
+        operations.append('histogram')
+
+    # If no operations specified and not using -all, default to showing all
+    if not operations and not args.all:
+        operations = ['original', 'blur', 'mask', 'masked', 'analyze', 'landmarks', 'histogram']
 
     # CASE 1: Direct path to an image - display transformations
     if args.path and os.path.isfile(args.path):
         print(f"Processing single image: {args.path}")
-        process_image(args.path, destination=args.destination, args=args, display=True)
+        process_image(
+            args.path,
+            args.destination,
+            operations,
+            True,  # display=True
+            args.threshold_method,
+            args.threshold_value,
+            args.config
+        )
 
     # CASE 2: Source directory provided - save transformations to destination
     elif args.source and os.path.isdir(args.source):
@@ -334,15 +455,18 @@ def main():
         print(f"Processing all images in directory: {args.source}")
         print(f"Saving transformations to: {args.destination}")
 
-        for filename in os.listdir(args.source):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
-                image_path = os.path.join(args.source, filename)
-                process_image(image_path, destination=args.destination, args=args, display=False)
+        process_directory(
+            args.source,
+            args.destination,
+            operations,
+            args.threshold_method,
+            args.threshold_value,
+            args.config
+        )
 
     # No valid input
     else:
         print("Error: Please provide a valid image path or source directory")
-        parser = argparse.ArgumentParser()
         parser.print_help()
 
 
