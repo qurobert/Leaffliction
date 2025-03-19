@@ -1,55 +1,56 @@
-absl-py @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_e3w1nvit39/croot/absl-py_1714140475537/work
+absl-py==2.1.0
 astunparse==1.6.3
-Brotli @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_f7i0oxypt6/croot/brotli-split_1736182464088/work
+Brotli==1.0.9
 certifi==2025.1.31
 charset-normalizer==3.4.1
-contourpy @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_2cvjf0v4ux/croot/contourpy_1732540055997/work
-cycler @ file:///tmp/build/80754af9/cycler_1637851556182/work
-flake8 @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_91v8ac8dvq/croot/flake8_1726157185490/work
+contourpy==1.3.1
+cycler==0.11.0
+flake8==7.1.1
 flatbuffers==25.2.10
-fonttools @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_ce1jt_55vl/croot/fonttools_1737039388732/work
+fonttools==4.55.3
 gast==0.6.0
 google-pasta==0.2.0
 grpcio==1.71.0
-h5py @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_041r1kgv8p/croot/h5py_1737051128943/work
+h5py==3.12.1
 idna==3.10
 keras==3.9.0
-kiwisolver @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_cc2l_z_0ri/croot/kiwisolver_1737039586949/work
+kiwisolver==1.4.8
 libclang==18.1.1
-llvmlite @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_73beo5gg03/croot/llvmlite_1738678367886/work
+llvmlite==0.44.0
 Markdown==3.7
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 matplotlib==3.10.0
-mccabe @ file:///opt/conda/conda-bld/mccabe_1644221741721/work
-mdurl @ file:///Users/builder/cbouss/perseverance-python-buildout/croot/mdurl_1699237660008/work
+mccabe==0.7.0
+mdurl==0.1.0
 ml_dtypes==0.5.1
-namex @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_aac1cmw2z4/croot/namex_1715206944707/work
-numba @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_561yxj14ej/croot/numba_1738945530967/work
-numpy @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_falv04vejw/croot/numpy_and_numpy_base_1730835597469/work/dist/numpy-2.1.3-cp312-cp312-macosx_11_0_arm64.whl#sha256=7164b5c0130ef176555189929b287c3ccb0546509c32dcb3f43ed4aaf45e2d24
+namex==0.0.7
+numba==0.61.0
+numpy==2.1.3
 opencv-python==4.11.0.86
 opt_einsum==3.4.0
-optree @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_602l3ol2u3/croot/optree_1742210195941/work
-packaging @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_a6_qk3qyg7/croot/packaging_1734472142254/work
-pillow @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_85xj2lenf1/croot/pillow_1738010251686/work
+optree==0.14.1
+packaging==24.2
+pillow==11.1.0
+pip==25.0
 protobuf==5.29.3
-pycodestyle @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_7a9zakrbgk/croot/pycodestyle_1726150308557/work
-pyflakes @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_bbjb40dmuh/croot/pyflakes_1708962969108/work
+pycodestyle==2.12.1
+pyflakes==3.2.0
 Pygments==2.19.1
-pyparsing @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_65qfw6vkxg/croot/pyparsing_1731445528142/work
-python-dateutil @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_66ud1l42_h/croot/python-dateutil_1716495741162/work
+pyparsing==3.2.0
+python-dateutil==2.9.0.post0
 requests==2.32.3
-rich @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_034myiu7pr/croot/rich_1732638981241/work
+rich==13.9.4
 setuptools==72.1.0
-six @ file:///tmp/build/80754af9/six_1644875935023/work
+six==1.16.0
 tensorboard==2.19.0
 tensorboard-data-server==0.7.2
 tensorflow==2.19.0
 termcolor==2.5.0
-tornado @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_0axef5a0m0/croot/tornado_1733960501260/work
-tqdm @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_5642tzrprr/croot/tqdm_1738943467095/work
-typing_extensions @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_0b3jpv_f79/croot/typing_extensions_1734714864260/work
-unicodedata2 @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_b99hn8t9lq/croot/unicodedata2_1736541774279/work
+tornado==6.4.2
+tqdm==4.67.1
+typing_extensions==4.12.2
+unicodedata2==15.1.0
 urllib3==2.3.0
 Werkzeug==3.1.3
 wheel==0.45.1
