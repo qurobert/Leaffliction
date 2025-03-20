@@ -7,16 +7,17 @@ import json
 import os
 from tensorflow import truediv
 import matplotlib.pyplot as plt
-
+from Transformation import process_image
 from train_preprocessing import remove_background_cv2_part
 
 
 def predict_image(path, model, class_names, is_display=True):
     img = keras.utils.load_img(path, target_size=(256, 256))
-    img_without_background = remove_background_cv2_part(path, None, False)
+    results = process_image(path, None, ["masked"], False)
+    # img_back = remove_background_cv2_part(path, None, None)
 
     img_array = keras.utils.img_to_array(img)
-    # img_array = keras.utils.img_to_array(img_without_background)
+    img_array = keras.utils.img_to_array(results["masked"])
     img_array = keras.ops.expand_dims(img_array, 0)
 
     predictions = model.predict(img_array)
@@ -28,7 +29,7 @@ def predict_image(path, model, class_names, is_display=True):
     print(f"Predicted class for {path}: {prediction}")
     if is_display:
         display_image(img,
-                      img_without_background,
+                      results["masked"],
                       prediction,
                       os.path.splitext(os.path.basename(path))[0],
                       result)

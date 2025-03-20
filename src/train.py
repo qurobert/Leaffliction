@@ -6,6 +6,7 @@ import keras
 import logging
 
 from keras.src.legacy.preprocessing.image import ImageDataGenerator
+from matplotlib import pyplot as plt
 
 from train_preprocessing import balanced_dataset, remove_background
 from keras.src.utils import image_dataset_from_directory
@@ -93,6 +94,7 @@ def zip_processed_and_model_with_signature(
 
 
 def split_dataset_and_prepare_data(dir, model_dir):
+    print(f"Training with {dir} directory")
     train_dataset, val_dataset = image_dataset_from_directory(
         dir,
         validation_split=0.2,
@@ -130,77 +132,6 @@ def split_dataset_and_prepare_data(dir, model_dir):
 def make_model(img_size, num_classes):
     return keras.Sequential([
         keras.Input(shape=(img_size[0], img_size[1], 3)),
-        layers.Conv2D(32, (3, 3), activation='relu'),
-        layers.MaxPooling2D(2, 2),
-
-        layers.Conv2D(64, (3, 3), activation='relu'),
-        layers.MaxPooling2D(2, 2),
-
-        layers.Conv2D(128, (3, 3), activation='relu'),
-        layers.MaxPooling2D(2, 2),
-
-        layers.Flatten(),
-        layers.Dense(256, activation='relu'),
-        layers.Dropout(0.5),
-        layers.Dense(num_classes, activation='softmax')
-    ])
-
-
-def make_model2(img_size, num_classes):
-    return keras.Sequential([
-        # Entrée
-        keras.Input(shape=(img_size[0], img_size[1], 3)),
-
-        # Premier bloc  256x256 -> 128x128
-        layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D(2, 2),
-
-        # Deuxième bloc 128x128 -> 64x64
-        layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D(2, 2),
-
-        # Troisième bloc 64x64 -> 32x32
-        layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D(2, 2),
-
-        # Quatrième bloc 32x32 -> 16x16
-        layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D(2, 2),
-
-        # Cinquième bloc  16x16 -> 8x8
-        layers.Conv2D(512, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.Conv2D(512, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D(2, 2),
-
-        # Classificateur
-        layers.GlobalAveragePooling2D(),
-        layers.Dense(512, activation='relu'),
-        layers.BatchNormalization(),
-        layers.Dropout(0.5),
-        layers.Dense(256, activation='relu'),
-        layers.BatchNormalization(),
-        layers.Dropout(0.3),
-        layers.Dense(num_classes, activation='softmax')
-    ])
-
-
-def make_model3(img_size, num_classes):
-    return keras.Sequential([
-        keras.Input(shape=(img_size[0], img_size[1], 3)),
         # layers.Rescaling(1./255),
         layers.Conv2D(filters=16, kernel_size=4, activation='relu'),
         layers.MaxPooling2D(),
@@ -227,6 +158,17 @@ def configure_logger():
     )
 
 
+def plot_history(history, item):
+    plt.plot(history.history[item], label=item)
+    plt.plot(history.history["val_" + item], label="val_" + item)
+    plt.xlabel("Epochs")
+    plt.ylabel(item)
+    plt.title("Train and Validation {} Over Epochs".format(item), fontsize=14)
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+
 def main():
     args = argument_parser()
     raw_dir = args.raw_dir
@@ -242,41 +184,45 @@ def main():
     if is_preprocessing:
         balanced_dataset(raw_dir,
                          augmented_dir,
-                         number_of_features_by_classes=500)
+                         number_of_features_by_classes=1500)
         remove_background(augmented_dir, mask_directory)
 
     # Split the dataset and prepare it
-    # (train_dataset,
-    #  val_dataset,
-    #  class_names,
-    #  image_size) = split_dataset_and_prepare_data(augmented_dir, model_dir)
-    #
-    # # Make the model
-    # num_classes = len(class_names)
-    # model = make_model3(image_size, num_classes)
-    #
-    # # Compile the model
-    # model.compile(optimizer=keras.optimizers.Adam(3e-4),
-    #               loss=keras.losses.CategoricalCrossentropy(),
-    #               metrics=[keras.metrics.BinaryAccuracy(name="acc")])
-    #
-    # # Train the model
-    # model.fit(train_dataset, validation_data=val_dataset, epochs=10)
-    #
-    # # Save the model
-    # model.save(os.path.join(model_dir, "model.keras"))
-    #
-    # # Evaluate the model
-    # test_loss, test_acc = model.evaluate(val_dataset)
-    # log_message = f"Test Accuracy: {test_acc:.2f}"
-    # print(log_message)
-    # logging.info(log_message)
-    #
-    # # Make a zip of processed + model and remove directory
-    # zip_processed_and_model_with_signature(augmented_dir,
-    #                                        mask_directory,
-    #                                        model_dir,
-    #                                        zip_filename)
+    (train_dataset,
+     val_dataset,
+     class_names,
+     image_size) = split_dataset_and_prepare_data(mask_directory, model_dir)
+
+    # Make the model
+    num_classes = len(class_names)
+    model = make_model(image_size, num_classes)
+
+    # Compile the model
+    model.compile(optimizer=keras.optimizers.Adam(3e-4),
+                  loss=keras.losses.CategoricalCrossentropy(),
+                  metrics=[keras.metrics.BinaryAccuracy(name="acc")])
+
+    # Train the model
+    history = model.fit(train_dataset, validation_data=val_dataset, epochs=10)
+
+    # Save the model
+    model.save(os.path.join(model_dir, "model.keras"))
+
+    # Evaluate the model
+    test_loss, test_acc = model.evaluate(val_dataset)
+    log_message = f"Test Accuracy: {test_acc:.2f}"
+    print(log_message)
+    logging.info(log_message)
+
+    # Make a zip of processed + model and remove directory
+    zip_processed_and_model_with_signature(augmented_dir,
+                                           mask_directory,
+                                           model_dir,
+                                           zip_filename)
+
+    # Display plot
+    plot_history(history, "loss")
+    plot_history(history, "acc")
 
 
 if __name__ == "__main__":

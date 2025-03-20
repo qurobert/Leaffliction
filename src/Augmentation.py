@@ -48,7 +48,7 @@ def crop(image, crop_size=(150, 150)):
     return padded_image
 
 
-def contrast(image, alpha=1.5, beta=10):
+def contrast(image, alpha=1.2, beta=8):
     return cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
 
 
@@ -105,7 +105,7 @@ def augmented_files(filename):
         "Flipped": flip(image),
         "Cropped": crop(image),
         "Contrast": contrast(image),
-        "Rotated": rotate(image, random.randint(20, 90)),
+        "Rotated": rotate(image, random.randint(5, 15)),
         "Blur": blur(image),
         "Projective": projective(image)
     }

@@ -47,7 +47,7 @@ def apply_gaussian_blur(img_rgb):
     return s_gblur
 
 
-def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_value=130, config_path=None, img_blur=None):
+def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_value=130, config_path=None):
     """Create a binary mask for the plant with dynamic thresholding based on disease type"""
     # # Default threshold parameters
     # final_threshold_method = 'light'
@@ -113,13 +113,18 @@ def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_val
     # mask = pcv.dilate(mask, 3, 1)  # Dilate to capture more of the leaf
     # mask = pcv.erode(mask, 3, 1)  # Erode to clean edges
     # mask = pcv.fill(mask, 3)  # Final fill
-    pcv.plot_image(img_rgb)
-    # pcv.plot_image(img_blur)
+    s = pcv.rgb2gray_hsv(rgb_img=img_rgb, channel="s")
+    s_thresh = pcv.threshold.binary(
+        gray_img=s, threshold=60, object_type="light"
+    )
+    s_gblur = pcv.gaussian_blur(img=s_thresh, ksize=(5, 5),
+                                sigma_x=0, sigma_y=None)
+
     b = pcv.rgb2gray_lab(rgb_img=img_rgb, channel="b")
     b_thresh = pcv.threshold.binary(
         gray_img=b, threshold=200, object_type="light"
     )
-    bs = pcv.logical_or(bin_img1=img_blur, bin_img2=b_thresh)
+    bs = pcv.logical_or(bin_img1=s_gblur, bin_img2=b_thresh)
 
     masked = pcv.apply_mask(img=img_rgb, mask=bs, mask_color="white")
 
@@ -149,13 +154,9 @@ def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_val
 
     ab_fill = pcv.fill(bin_img=ab, size=200)
 
-    masked2 = pcv.apply_mask(img=masked, mask=ab_fill, mask_color="white")
+    masked2 = pcv.apply_mask(img=masked, mask=ab_fill, mask_color="black")
 
-    pcv.plot_image(masked)
-    pcv.plot_image(ab_fill)
-    pcv.plot_image(masked2)
-
-    return masked, ab_fill
+    return img_rgb, bs
 
 
 def apply_mask_to_image(masked_img, mask):
@@ -357,8 +358,7 @@ def process_image(image_path, destination=None, operations=None, display=False,
 
     # 3. Create mask
     if any(op in operations for op in ['mask', 'masked', 'analyze', 'landmarks']):
-        masked_img, mask = create_mask(img_rgb, image_path, threshold_method, threshold_value, config_path,
-                           img_blur=results['blur'])
+        img_rbg, mask = create_mask(img_rgb, image_path, threshold_method, threshold_value, config_path)
         if 'mask' in operations:
             results['mask'] = mask
             transformations.append((mask, "Mask"))
@@ -368,7 +368,7 @@ def process_image(image_path, destination=None, operations=None, display=False,
 
         # 4. Apply mask to image
         if 'masked' in operations:
-            applied = apply_mask_to_image(masked_img, mask)
+            applied = apply_mask_to_image(img_rbg, mask)
             results['masked'] = applied
             transformations.append((applied, "Applied Mask"))
             if destination:

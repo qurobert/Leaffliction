@@ -13,7 +13,7 @@ import numpy as np
 
 def balanced_dataset(raw_directory,
                      processed_directory,
-                     number_of_features_by_classes=1000):
+                     number_of_features_by_classes=1500):
     dir_files = get_directory_files(raw_directory)
     os.makedirs(processed_directory, exist_ok=True)
     if len(os.listdir(processed_directory)) != 0:
@@ -47,6 +47,13 @@ def balanced_dataset(raw_directory,
             # Get random augmentation
             augmented = augmented_files(filename)
             augmented.pop("Original")
+            # augmented.pop("Cropped")
+            # augmented.pop("Rotated")
+            # augmented.pop("Blur")
+            # augmented.pop("Flipped")
+            # augmented.pop("Contrast")
+            # augmented.pop("Projective")
+
             title = random.choice(list(augmented.keys()))
 
             # Save augmented image
@@ -61,7 +68,7 @@ def balanced_dataset(raw_directory,
                 count += 1
             else:
                 error_count += 1
-                if error_count > 1000:
+                if error_count > 10000:
                     raise Exception("Error count is too high, "
                                     "please check the code")
 
@@ -73,11 +80,11 @@ def remove_background(processed_dir, mask_directory):
     for root, _, files in os.walk(processed_dir):
         for file in tqdm.tqdm(files,  f"Removing background directory {root}"):
             filename = os.path.join(root, file)
-            dir_filename = os.path.dirname(filename)
+            dir_filename = os.path.basename(os.path.dirname(filename))
             # destination = os.path.join(mask_directory, dir_filename)
             # os.makedirs(augmented_directory, exist_ok=True)
-            remove_background_cv2_part(filename, dir_filename)
-            # process_image(filename, mask_directory, ["masked"])
+            # remove_background_cv2_part(filename, dir_filename)
+            process_image(filename, os.path.join(mask_directory, dir_filename), ["masked"])
 
 
 def remove_background_cv2_part(filename, augmented_directory, save_image=True):
