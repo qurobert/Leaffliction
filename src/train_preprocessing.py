@@ -1,10 +1,14 @@
+import argparse
+from types import SimpleNamespace
 from Augmentation import augmented_files
 from Distribution import get_directory_files
+from Transformation import process_image
 import tqdm
 import cv2
 import os
 import shutil
 import random
+import numpy as np
 
 
 def balanced_dataset(raw_directory,
@@ -60,3 +64,53 @@ def balanced_dataset(raw_directory,
                 if error_count > 1000:
                     raise Exception("Error count is too high, "
                                     "please check the code")
+
+
+def remove_background(processed_dir, mask_directory):
+    if os.path.exists(mask_directory):
+        shutil.rmtree(mask_directory)
+    os.makedirs(mask_directory, exist_ok=True)
+    for root, _, files in os.walk(processed_dir):
+        for file in tqdm.tqdm(files,  f"Removing background directory {root}"):
+            filename = os.path.join(root, file)
+            dir_filename = os.path.dirname(filename)
+            # destination = os.path.join(mask_directory, dir_filename)
+            # os.makedirs(augmented_directory, exist_ok=True)
+            remove_background_cv2_part(filename, dir_filename)
+            # process_image(filename, mask_directory, ["masked"])
+
+
+def remove_background_cv2_part(filename, augmented_directory, save_image=True):
+    image = cv2.imread(filename)
+
+    # Convertir l'image en HSV
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # Définir les seuils pour la couleur verte
+    lower_green = np.array([35, 40, 40])  # Borne inférieure (H, S, V)
+    upper_green = np.array([85, 255, 255])  # Borne supérieure (H, S, V)
+
+    # Créer un masque pour la couleur verte
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+
+    # Améliorer le masque (ouverture + fermeture pour enlever le bruit)
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Inverser le masque pour ne garder que la feuille
+    mask_inv = cv2.bitwise_not(mask)
+
+    # Appliquer le masque pour supprimer le fond gris
+    result = cv2.bitwise_and(image, image, mask=mask)
+
+    # RGB
+    # result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+    # print(result.shape)
+
+    # Enregistrer l'image
+    if save_image:
+        result_filename = os.path.join(augmented_directory, os.path.splitext(os.path.basename(filename))[0] + "_masked.JPG")
+        # result_filename = os.path.join(destination, os.path.basename(filename))
+        cv2.imwrite(str(result_filename), result)
+    return result

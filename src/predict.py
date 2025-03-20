@@ -1,4 +1,6 @@
 import argparse
+
+import cv2
 import numpy as np
 import keras
 import json
@@ -6,19 +8,27 @@ import os
 from tensorflow import truediv
 import matplotlib.pyplot as plt
 
+from train_preprocessing import remove_background_cv2_part
+
 
 def predict_image(path, model, class_names, is_display=True):
     img = keras.utils.load_img(path, target_size=(256, 256))
+    img_without_background = remove_background_cv2_part(path, None, False)
+
     img_array = keras.utils.img_to_array(img)
+    # img_array = keras.utils.img_to_array(img_without_background)
     img_array = keras.ops.expand_dims(img_array, 0)
+
     predictions = model.predict(img_array)
     predicted_class = np.argmax(predictions[0])
     prediction = class_names[predicted_class]
     result = prediction.lower() in path.lower()
-
+    if not result:
+        print("RESULT FALSE FOR : ", prediction.lower(), path.lower())
     print(f"Predicted class for {path}: {prediction}")
     if is_display:
         display_image(img,
+                      img_without_background,
                       prediction,
                       os.path.splitext(os.path.basename(path))[0],
                       result)
@@ -26,13 +36,14 @@ def predict_image(path, model, class_names, is_display=True):
     return result
 
 
-def display_image(img, prediction, original_name, result):
+def display_image(img, img_without_background, prediction, original_name, result):
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
     axes[0].imshow(img)
     axes[0].axis("off")
 
-    axes[1].imshow(img)
+    img_without_background_rgb = cv2.cvtColor(img_without_background, cv2.COLOR_BGR2RGB)
+    axes[1].imshow(img_without_background_rgb)
     axes[1].axis("off")
 
     plt.figtext(0.5, 0.08,
@@ -104,7 +115,7 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    # try:
+    main()
+    # except Exception as e:
+    #     print(e)

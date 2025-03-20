@@ -4,7 +4,10 @@ import zipfile
 import os
 import keras
 import logging
-from train_balanced_dataset import balanced_dataset
+
+from keras.src.legacy.preprocessing.image import ImageDataGenerator
+
+from train_preprocessing import balanced_dataset, remove_background
 from keras.src.utils import image_dataset_from_directory
 from keras import layers
 from tensorflow import data as tf_data
@@ -21,14 +24,22 @@ def argument_parser():
                         type=str,
                         help="Raw dataset directory",
                         default="data/raw")
-    parser.add_argument('--processed_dir',
+    parser.add_argument('--augmented_dir',
                         type=str,
-                        default="data/processed",
-                        help="The processed dataset directory")
+                        default="data/augmented",
+                        help="The augmented dataset directory")
     parser.add_argument('--model_dir',
                         type=str,
                         default="data/model",
                         help="The model dataset directory")
+    parser.add_argument('--mode',
+                        type=str,
+                        default="data/model",
+                        help="The model dataset directory")
+    parser.add_argument('--mask_directory',
+                        type=str,
+                        default="data/augmented_mask",
+                        help="The directory for image without background")
     parser.add_argument('--no_processing',
                         action="store_false",
                         help="Do not preprocess the dataset")
@@ -50,6 +61,7 @@ def compute_sha256(file_path):
 
 def zip_processed_and_model_with_signature(
         processed_dir,
+        mask_dir,
         model_dir,
         zip_path,
         signature_path="signature.txt"):
@@ -64,6 +76,11 @@ def zip_processed_and_model_with_signature(
             for file in files:
                 zipf.write(os.path.join(root, file))
 
+        # Mask
+        for root, dirs, files in os.walk(mask_dir):
+            for file in files:
+                zipf.write(os.path.join(root, file))
+
     signature = compute_sha256(zip_path)
 
     # Ajouter la signature dans signature.txt
@@ -75,9 +92,9 @@ def zip_processed_and_model_with_signature(
     print(f"✅ Signature générée : {signature}")
 
 
-def split_dataset_and_prepare_data(processed_dir, model_dir):
+def split_dataset_and_prepare_data(dir, model_dir):
     train_dataset, val_dataset = image_dataset_from_directory(
-        processed_dir,
+        dir,
         validation_split=0.2,
         subset="both",
         seed=42,
@@ -123,9 +140,81 @@ def make_model(img_size, num_classes):
         layers.MaxPooling2D(2, 2),
 
         layers.Flatten(),
-        layers.Dense(128, activation='relu'),
+        layers.Dense(256, activation='relu'),
         layers.Dropout(0.5),
         layers.Dense(num_classes, activation='softmax')
+    ])
+
+
+def make_model2(img_size, num_classes):
+    return keras.Sequential([
+        # Entrée
+        keras.Input(shape=(img_size[0], img_size[1], 3)),
+
+        # Premier bloc  256x256 -> 128x128
+        layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D(2, 2),
+
+        # Deuxième bloc 128x128 -> 64x64
+        layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D(2, 2),
+
+        # Troisième bloc 64x64 -> 32x32
+        layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D(2, 2),
+
+        # Quatrième bloc 32x32 -> 16x16
+        layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D(2, 2),
+
+        # Cinquième bloc  16x16 -> 8x8
+        layers.Conv2D(512, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.Conv2D(512, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D(2, 2),
+
+        # Classificateur
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(512, activation='relu'),
+        layers.BatchNormalization(),
+        layers.Dropout(0.5),
+        layers.Dense(256, activation='relu'),
+        layers.BatchNormalization(),
+        layers.Dropout(0.3),
+        layers.Dense(num_classes, activation='softmax')
+    ])
+
+
+def make_model3(img_size, num_classes):
+    return keras.Sequential([
+        keras.Input(shape=(img_size[0], img_size[1], 3)),
+        # layers.Rescaling(1./255),
+        layers.Conv2D(filters=16, kernel_size=4, activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Conv2D(filters=32, kernel_size=4, activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Dropout(0.1),
+        layers.Conv2D(filters=64, kernel_size=4, activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Dropout(0.1),
+        layers.Conv2D(filters=128, kernel_size=4, activation='relu'),
+        layers.MaxPooling2D(),
+        layers.Flatten(),
+        layers.Dense(units=128, activation='relu'),
+        layers.Dense(units=num_classes, activation='softmax')
     ])
 
 
@@ -141,55 +230,57 @@ def configure_logger():
 def main():
     args = argument_parser()
     raw_dir = args.raw_dir
-    processed_dir = args.processed_dir
+    augmented_dir = args.augmented_dir
     is_preprocessing = args.no_processing
     model_dir = args.model_dir
     zip_filename = args.zip_filename
-
+    mask_directory = args.mask_directory
     # Configure the logger
     configure_logger()
 
     # Preprocess the dataset
-    # if is_preprocessing:
-    #     balanced_dataset(raw_dir,
-    #                      processed_dir,
-    #                      number_of_features_by_classes=1000)
+    if is_preprocessing:
+        balanced_dataset(raw_dir,
+                         augmented_dir,
+                         number_of_features_by_classes=500)
+        remove_background(augmented_dir, mask_directory)
 
     # Split the dataset and prepare it
-    (train_dataset,
-     val_dataset,
-     class_names,
-     image_size) = split_dataset_and_prepare_data(processed_dir, model_dir)
-
-    # Make the model
-    num_classes = len(class_names)
-    model = make_model(image_size, num_classes)
-
-    # Compile the model
-    model.compile(optimizer=keras.optimizers.Adam(3e-4),
-                  loss=keras.losses.CategoricalCrossentropy(),
-                  metrics=[keras.metrics.BinaryAccuracy(name="acc")])
-
-    # Train the model
-    model.fit(train_dataset, validation_data=val_dataset, epochs=10)
-
-    # Save the model
-    model.save(os.path.join(model_dir, "model.keras"))
-
-    # Evaluate the model
-    test_loss, test_acc = model.evaluate(val_dataset)
-    log_message = f"Test Accuracy: {test_acc:.2f}"
-    print(log_message)
-    logging.info(log_message)
-
-    # Make a zip of processed + model and remove directory
-    zip_processed_and_model_with_signature(processed_dir,
-                                           model_dir,
-                                           zip_filename)
+    # (train_dataset,
+    #  val_dataset,
+    #  class_names,
+    #  image_size) = split_dataset_and_prepare_data(augmented_dir, model_dir)
+    #
+    # # Make the model
+    # num_classes = len(class_names)
+    # model = make_model3(image_size, num_classes)
+    #
+    # # Compile the model
+    # model.compile(optimizer=keras.optimizers.Adam(3e-4),
+    #               loss=keras.losses.CategoricalCrossentropy(),
+    #               metrics=[keras.metrics.BinaryAccuracy(name="acc")])
+    #
+    # # Train the model
+    # model.fit(train_dataset, validation_data=val_dataset, epochs=10)
+    #
+    # # Save the model
+    # model.save(os.path.join(model_dir, "model.keras"))
+    #
+    # # Evaluate the model
+    # test_loss, test_acc = model.evaluate(val_dataset)
+    # log_message = f"Test Accuracy: {test_acc:.2f}"
+    # print(log_message)
+    # logging.info(log_message)
+    #
+    # # Make a zip of processed + model and remove directory
+    # zip_processed_and_model_with_signature(augmented_dir,
+    #                                        mask_directory,
+    #                                        model_dir,
+    #                                        zip_filename)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    # try:
+    main()
+    # except Exception as e:
+    #     print(e)
