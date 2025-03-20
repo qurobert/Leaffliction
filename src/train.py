@@ -5,7 +5,6 @@ import os
 import keras
 import logging
 
-from keras.src.legacy.preprocessing.image import ImageDataGenerator
 from matplotlib import pyplot as plt
 
 from train_preprocessing import balanced_dataset, remove_background
