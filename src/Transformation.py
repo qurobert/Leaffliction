@@ -3,9 +3,7 @@ import cv2
 import numpy as np
 import argparse
 import os
-import matplotlib
 
-# matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from plantcv import plantcv as pcv
 import json
@@ -37,7 +35,8 @@ def apply_gaussian_blur(img_rgb):
     return s_gblur
 
 
-def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_value=130, config_path=None):
+def create_mask(img_rgb, image_path=None, threshold_method='auto',
+                threshold_value=130, config_path=None):
     s = pcv.rgb2gray_hsv(rgb_img=img_rgb, channel="s")
     s_thresh = pcv.threshold.binary(
         gray_img=s, threshold=60, object_type="light"
@@ -55,19 +54,23 @@ def create_mask(img_rgb, image_path=None, threshold_method='auto', threshold_val
 
 
 def apply_mask_to_image(masked_img, mask):
-    return pcv.apply_mask(img=masked_img, mask=mask, mask_color="white")
+    return pcv.apply_mask(img=masked_img, mask=mask,
+                          mask_color="white")
 
 
 def analyze_object(img_rgb, mask):
-    shape_img = pcv.analyze.size(img=img_rgb, labeled_mask=mask, n_labels=1)
-    pcv.outputs.save_results(filename="results.txt", outformat="json")
+    shape_img = pcv.analyze.size(img=img_rgb, labeled_mask=mask,
+                                 n_labels=1)
+    pcv.outputs.save_results(filename="results.txt",
+                             outformat="json")
     return shape_img
 
 
 def generate_pseudolandmarks(img_rgb, mask):
     pseudo_img = img_rgb.copy()
     pcv.params.debug_outdir = "./temp/"
-    top_x, bottom_x, center_v_x = pcv.homology.x_axis_pseudolandmarks(img=pseudo_img, mask=mask, label="default")
+    top_x, bottom_x, center_v_x = pcv.homology.x_axis_pseudolandmarks(
+        img=pseudo_img, mask=mask, label="default")
 
     for point in top_x:
         x, y = int(point[0][0]), int(point[0][1])
@@ -83,10 +86,9 @@ def generate_pseudolandmarks(img_rgb, mask):
 
 
 def create_color_histogram(img_rgb):
-    fig = plt.figure(figsize=(8, 6))
-
     colors = ('red', 'green', 'blue')
-    color_labels = ['red', 'blue-yellow', 'green', 'green-magenta', 'hue', 'lightness', 'red', 'saturation', 'value']
+    color_labels = ['red', 'blue-yellow', 'green', 'green-magenta',
+                    'hue', 'lightness', 'red', 'saturation', 'value']
     color_values = ['r', 'c', 'g', 'm', 'violet', 'gray', 'r', 'y', 'b']
 
     for i, color in enumerate(colors):
@@ -98,21 +100,30 @@ def create_color_histogram(img_rgb):
     for i, label in enumerate(['hue', 'saturation', 'value']):
         if i == 0:  # Hue has range 0-179 in OpenCV
             hist = cv2.calcHist([img_hsv], [i], None, [180], [0, 180])
-            plt.plot(hist, color=color_values[i + 4], alpha=0.7, label=color_labels[i + 4])
+            plt.plot(hist, color=color_values[i + 4],
+                     alpha=0.7, label=color_labels[i + 4])
         else:
-            hist = cv2.calcHist([img_hsv], [i], None, [256], [0, 256])
-            plt.plot(hist, color=color_values[i + 6], alpha=0.7, label=color_labels[i + 6])
+            hist = cv2.calcHist([img_hsv], [i],
+                                None, [256], [0, 256])
+            plt.plot(hist, color=color_values[i + 6],
+                     alpha=0.7, label=color_labels[i + 6])
 
     img_lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
 
-    hist = cv2.calcHist([img_lab], [0], None, [256], [0, 256])
-    plt.plot(hist, color=color_values[5], alpha=0.7, label=color_labels[5])
+    hist = cv2.calcHist([img_lab], [0],
+                        None, [256], [0, 256])
+    plt.plot(hist, color=color_values[5], alpha=0.7,
+             label=color_labels[5])
 
-    hist = cv2.calcHist([img_lab], [1], None, [256], [0, 256])
-    plt.plot(hist, color=color_values[3], alpha=0.7, label=color_labels[3])
+    hist = cv2.calcHist([img_lab], [1],
+                        None, [256], [0, 256])
+    plt.plot(hist, color=color_values[3], alpha=0.7,
+             label=color_labels[3])
 
-    hist = cv2.calcHist([img_lab], [2], None, [256], [0, 256])
-    plt.plot(hist, color=color_values[1], alpha=0.7, label=color_labels[1])
+    hist = cv2.calcHist([img_lab], [2],
+                        None, [256], [0, 256])
+    plt.plot(hist, color=color_values[1], alpha=0.7,
+             label=color_labels[1])
 
     plt.xlabel('Pixel intensity')
     plt.ylabel('Proportion of pixels (%)')
@@ -163,8 +174,10 @@ def display_images(transformations):
     plt.show()
 
 
-def process_image(image_path, destination=None, operations=None, display=False,
-                  threshold_method='auto', threshold_value=130, config_path=None, apply_blur=True):
+def process_image(image_path, destination=None, operations=None,
+                  display=False,
+                  threshold_method='auto', threshold_value=130,
+                  config_path=None, apply_blur=True):
     img_rgb, path, filename = load_image(image_path)
     if img_rgb is None:
         return None
@@ -182,20 +195,25 @@ def process_image(image_path, destination=None, operations=None, display=False,
         results['original'] = img_rgb
         transformations.append((img_rgb, "Original"))
         if destination:
-            save_path = os.path.join(destination, f"{file_name}_original{ext}")
+            save_path = os.path.join(destination,
+                                     f"{file_name}_original{ext}")
             save_image(img_rgb, save_path)
 
     if apply_blur or 'blur' in operations:
         img_rgb_processed = apply_gaussian_blur(img_rgb)
         if 'blur' in operations:
             results['blur'] = img_rgb_processed
-            transformations.append((img_rgb_processed, "Gaussian blur"))
+            transformations.append((img_rgb_processed,
+                                    "Gaussian blur"))
             if destination:
-                save_path = os.path.join(destination, f"{file_name}_gaussian_blur{ext}")
+                save_path = os.path.join(destination,
+                                         f"{file_name}_gaussian_blur{ext}")
                 save_image(img_rgb_processed, save_path)
 
-    if any(op in operations for op in ['mask', 'masked', 'analyze', 'landmarks']):
-        img_rbg, mask = create_mask(img_rgb, image_path, threshold_method, threshold_value, config_path)
+    if any(op in operations for op in ['mask', 'masked',
+                                       'analyze', 'landmarks']):
+        img_rbg, mask = create_mask(img_rgb, image_path, threshold_method,
+                                    threshold_value, config_path)
         if 'mask' in operations:
             results['mask'] = mask
             transformations.append((mask, "Mask"))
@@ -208,7 +226,8 @@ def process_image(image_path, destination=None, operations=None, display=False,
             results['masked'] = applied
             transformations.append((applied, "Applied Mask"))
             if destination:
-                save_path = os.path.join(destination, f"{file_name}_applied_mask{ext}")
+                save_path = os.path.join(destination,
+                                         f"{file_name}_applied_mask{ext}")
                 save_image(applied, save_path)
 
         if 'analyze' in operations:
@@ -216,7 +235,8 @@ def process_image(image_path, destination=None, operations=None, display=False,
             results['analyze'] = shape_img
             transformations.append((shape_img, "Analyze Object"))
             if destination:
-                save_path = os.path.join(destination, f"{file_name}_analyze_object{ext}")
+                save_path = os.path.join(destination,
+                                         f"{file_name}_analyze_object{ext}")
                 save_image(shape_img, save_path)
 
         if 'landmarks' in operations:
@@ -224,7 +244,8 @@ def process_image(image_path, destination=None, operations=None, display=False,
             results['landmarks'] = pseudo_img
             transformations.append((pseudo_img, "Pseudolandmarks"))
             if destination:
-                save_path = os.path.join(destination, f"{file_name}_pseudolandmarks{ext}")
+                save_path = os.path.join(destination,
+                                         f"{file_name}_pseudolandmarks{ext}")
                 save_image(pseudo_img, save_path)
 
     if 'histogram' in operations:
@@ -232,7 +253,8 @@ def process_image(image_path, destination=None, operations=None, display=False,
         results['histogram'] = hist_img
         transformations.append((hist_img, "Color Histogram"))
         if destination:
-            save_path = os.path.join(destination, f"{file_name}_color_histogram{ext}")
+            save_path = os.path.join(destination,
+                                     f"{file_name}_color_histogram{ext}")
             save_image(hist_img, save_path)
 
     if display and transformations:
@@ -241,14 +263,18 @@ def process_image(image_path, destination=None, operations=None, display=False,
     return results
 
 
-def process_directory(source_dir, destination_dir, operations=None,
-                      threshold_method='auto', threshold_value=130, config_path=None, apply_blur=True):
+def process_directory(source_dir, destination_dir,
+                      operations=None,
+                      threshold_method='auto',
+                      threshold_value=130, config_path=None,
+                      apply_blur=True):
     if not os.path.exists(destination_dir):
         os.makedirs(destination_dir)
 
     results = {}
     for filename in os.listdir(source_dir):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg',
+                                      '.bmp', '.tif', '.tiff')):
             image_path = os.path.join(source_dir, filename)
             print(f"Processing {image_path}...")
             img_results = process_image(
@@ -268,25 +294,54 @@ def process_directory(source_dir, destination_dir, operations=None,
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Leaf Image Transformation Tool')
-    parser.add_argument('path', nargs='?', help='Path to a single image to display transformations')
-    parser.add_argument('-src', '--source', help='Source directory containing images to process and save')
-    parser.add_argument('-dst', '--destination', help='Destination directory for saving transformed images')
+    parser = argparse.ArgumentParser(
+        description='Leaf Image Transformation Tool')
+    parser.add_argument(
+        'path', nargs='?',
+        help='Path to a single image to display transformations')
+    parser.add_argument(
+        '-src', '--source',
+        help='Source directory containing images to process and save')
+    parser.add_argument(
+        '-dst', '--destination',
+        help='Destination directory for saving transformed images')
 
-    parser.add_argument('-original', action='store_true', help='Save original image')
-    parser.add_argument('-blur', action='store_true', help='Apply Gaussian blur transformation')
-    parser.add_argument('-mask', action='store_true', help='Generate binary mask')
-    parser.add_argument('-masked', action='store_true', help='Apply mask to the original image')
-    parser.add_argument('-analyze', action='store_true', help='Analyze object size and shape')
-    parser.add_argument('-landmarks', action='store_true', help='Generate pseudolandmarks')
-    parser.add_argument('-histogram', action='store_true', help='Generate color histogram')
-    parser.add_argument('-all', action='store_true', help='Apply all transformations')
+    parser.add_argument(
+        '-original', action='store_true',
+        help='Save original image')
+    parser.add_argument(
+        '-blur', action='store_true',
+        help='Apply Gaussian blur transformation')
+    parser.add_argument(
+        '-mask', action='store_true',
+        help='Generate binary mask')
+    parser.add_argument(
+        '-masked', action='store_true',
+        help='Apply mask to the original image')
+    parser.add_argument(
+        '-analyze', action='store_true',
+        help='Analyze object size and shape')
+    parser.add_argument(
+        '-landmarks', action='store_true',
+        help='Generate pseudolandmarks')
+    parser.add_argument('-histogram',
+                        action='store_true',
+                        help='Generate color histogram')
+    parser.add_argument('-all',
+                        action='store_true',
+                        help='Apply all transformations')
 
-    parser.add_argument('-threshold-method', choices=['auto', 'light', 'dark'], default='auto',
-                        help='Thresholding method (auto determines based on disease in filename)')
-    parser.add_argument('-threshold-value', type=int, default=130,
-                        help='Threshold value for LAB channel')
-    parser.add_argument('-config', help='Path to JSON config file with threshold settings for each disease')
+    parser.add_argument(
+        '-threshold-method', choices=['auto', 'light', 'dark'],
+        default='auto',
+        help='Thresholding method ('
+        'auto determines based on disease in filename)')
+    parser.add_argument(
+        '-threshold-value', type=int, default=130,
+        help='Threshold value for LAB channel')
+    parser.add_argument(
+        '-config', help='Path to JSON config file'
+                        ' with threshold settings for each disease')
 
     args = parser.parse_args()
 
@@ -307,7 +362,8 @@ def main():
         operations.append('histogram')
 
     if not operations and not args.all:
-        operations = ['original', 'blur', 'mask', 'masked', 'analyze', 'landmarks', 'histogram']
+        operations = ['original', 'blur', 'mask', 'masked',
+                      'analyze', 'landmarks', 'histogram']
 
     if args.path and os.path.isfile(args.path):
         print(f"Processing single image: {args.path}")
@@ -323,7 +379,8 @@ def main():
 
     elif args.source and os.path.isdir(args.source):
         if not args.destination:
-            print("Error: Destination directory (-dst) is required when processing a directory")
+            print("Error: Destination directory (-dst) is"
+                  " required when processing a directory")
             return
 
         print(f"Processing all images in directory: {args.source}")
@@ -339,7 +396,8 @@ def main():
         )
 
     else:
-        print("Error: Please provide a valid image path or source directory")
+        print("Error: Please provide a valid image path"
+              " or source directory")
         parser.print_help()
 
 
