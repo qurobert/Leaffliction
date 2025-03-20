@@ -5,7 +5,7 @@ import argparse
 import os
 import matplotlib
 
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from plantcv import plantcv as pcv
 import json
