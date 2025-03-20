@@ -8,7 +8,6 @@ import os
 from tensorflow import truediv
 import matplotlib.pyplot as plt
 from Transformation import process_image
-from train_preprocessing import remove_background_cv2_part
 
 
 def predict_image(path, model, class_names, is_display=True):
@@ -37,13 +36,18 @@ def predict_image(path, model, class_names, is_display=True):
     return result
 
 
-def display_image(img, img_without_background, prediction, original_name, result):
+def display_image(img,
+                  img_without_background,
+                  prediction,
+                  original_name,
+                  result):
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
     axes[0].imshow(img)
     axes[0].axis("off")
 
-    img_without_background_rgb = cv2.cvtColor(img_without_background, cv2.COLOR_BGR2RGB)
+    img_without_background_rgb = cv2.cvtColor(img_without_background,
+                                              cv2.COLOR_BGR2RGB)
     axes[1].imshow(img_without_background_rgb)
     axes[1].axis("off")
 
