@@ -1,4 +1,5 @@
-# Leaffliction 🥬🩺  
+# Leaffliction 🥬🩺
+
 _Image classification &amp; disease recognition on plant leaves_
 
 A complete computer‑vision pipeline that balances your dataset, augments images, extracts key features (PlantCV), trains a CNN with TensorFlow / Keras, signs the resulting artefacts, and predicts diseases from new leaf photos.
